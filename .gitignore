@@ -1,0 +1,8 @@
+# IDE config files
+.idea/
+
+# CMake build and debug files
+cmake-build-debug/
+
+# Built modules
+*.o
