@@ -7,6 +7,6 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ../bin/)
 
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_COMPILER gcc)
-set(CMAKE_C_FLAGS "-std=gnu99 -Wall -Wextra -g")
+set(CMAKE_C_FLAGS "-std=gnu99 -Wall -Wextra -g -DNDEBUG")
 
 add_executable(test_mmal src/mmal.c test/test_mmal.c)

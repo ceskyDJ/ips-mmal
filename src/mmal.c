@@ -71,12 +71,9 @@ Arena *first_arena = NULL;
 /**
  * Return size alligned to PAGE_SIZE
  */
-static
 size_t allign_page(size_t size)
 {
-    // FIXME
-    (void)size;
-    return size;
+    return (size + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
 }
 
 /**
@@ -96,9 +93,18 @@ size_t allign_page(size_t size)
 static
 Arena *arena_alloc(size_t req_size)
 {
-    // FIXME
-    (void)req_size;
-    return NULL;
+    size_t aligned_size = allign_page(req_size);
+
+    // Allocate new arena with mmap
+    Arena *arena;
+    if ((arena = mmap(NULL, aligned_size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
+        return NULL;
+    }
+
+    arena->size = aligned_size;
+    arena->next = NULL;
+
+    return arena;
 }
 
 /**
@@ -108,8 +114,13 @@ Arena *arena_alloc(size_t req_size)
 static
 void arena_append(Arena *a)
 {
-    // FIXME
-    (void)a;
+    // Find last arena in linked list
+    Arena *last_arena = first_arena;
+    while (last_arena->next != NULL) {
+        last_arena = last_arena->next;
+    }
+
+    last_arena->next = a;
 }
 
 /**
@@ -128,9 +139,9 @@ void arena_append(Arena *a)
 static
 void hdr_ctor(Header *hdr, size_t size)
 {
-    // FIXME
-    (void)hdr;
-    (void)size;
+    hdr->next = NULL;
+    hdr->size = size;
+    hdr->asize = 0; // Not allocated by program
 }
 
 /**
@@ -144,11 +155,10 @@ void hdr_ctor(Header *hdr, size_t size)
 static
 bool hdr_should_split(Header *hdr, size_t size)
 {
-    // FIXME
-    (void)hdr;
-    (void)size;
     assert(size > 0);
-    return false;
+
+    // 32 B is minimum block size
+    return (hdr->size - (size + sizeof(Header) + 32)) > 0;
 }
 
 /**
@@ -177,10 +187,24 @@ bool hdr_should_split(Header *hdr, size_t size)
 static
 Header *hdr_split(Header *hdr, size_t req_size)
 {
-    // FIXME
-    (void)hdr;
-    (void)req_size;
-    return NULL;
+    // Count really allocated size (often bigger than req_size)
+    size_t align = sizeof(size_t);
+    // 32 B is minimum block size
+    size_t alloc_size = ((req_size < 32) ? 32 : req_size);
+
+    // Create new header (for block which is the rest of the old big block)
+    Header *new_hdr = (Header *)((char *)hdr + sizeof(Header) + alloc_size);
+    hdr_ctor(new_hdr, hdr->size - sizeof(Header) - alloc_size);
+
+    // Update old header
+    hdr->size = alloc_size;
+    hdr->asize = req_size;
+
+    // Update list pointers
+    new_hdr->next = hdr->next;
+    hdr->next = new_hdr;
+
+    return new_hdr;
 }
 
 /**
@@ -194,10 +218,12 @@ Header *hdr_split(Header *hdr, size_t req_size)
 static
 bool hdr_can_merge(Header *left, Header *right)
 {
-    // FIXME
-    (void)left;
-    (void)right;
-    return false;
+    // There is a non-free block
+    if (left->asize != 0 || right->asize != 0) {
+        return false;
+    }
+
+    return (((char *)left + sizeof(Header) + left->size) == (char *)right);
 }
 
 /**
@@ -210,9 +236,8 @@ bool hdr_can_merge(Header *left, Header *right)
 static
 void hdr_merge(Header *left, Header *right)
 {
-    (void)left;
-    (void)right;
-    // FIXME
+    left->size = left->size + sizeof(Header) + right->size;
+    left->next = right->next;
 }
 
 /**
@@ -224,9 +249,15 @@ void hdr_merge(Header *left, Header *right)
 static
 Header *best_fit(size_t size)
 {
-    // FIXME
-    (void)size;
-    return NULL;
+    Header *first_hdr = (Header *)((char *)first_arena + sizeof(Arena));
+    Header *best_fit = first_hdr;
+    for (Header *curr_hdr = first_hdr->next; curr_hdr != first_hdr; curr_hdr = curr_hdr->next) {
+        if (curr_hdr->size < best_fit->size && curr_hdr->size >= size) {
+            best_fit = curr_hdr;
+        }
+    }
+
+    return best_fit;
 }
 
 /**
@@ -239,9 +270,12 @@ Header *best_fit(size_t size)
 static
 Header *hdr_get_prev(Header *hdr)
 {
-    // FIXME
-    (void)hdr;
-    return NULL;
+    Header *current_header = (Header *)((char *)first_arena + sizeof(Arena));
+    while (current_header->next != hdr) {
+        current_header = current_header->next;
+    }
+
+    return current_header;
 }
 
 /**
@@ -251,6 +285,11 @@ Header *hdr_get_prev(Header *hdr)
  */
 void *mmalloc(size_t size)
 {
+    // Check for bad input value
+    if (size == 0) {
+        return NULL;
+    }
+
     // FIXME
     (void)size;
     return NULL;
