@@ -210,7 +210,9 @@ bool hdr_should_split(Header *hdr, size_t size)
     assert(hdr->asize == 0);
     assert(size > 0);
 
-    return (hdr->size - (MAX(size, MIN_BLOCK_SIZE) + sizeof(Header) + MIN_BLOCK_SIZE)) > 0;
+    size_t aligned_size = ALIGN(size, sizeof(size_t));
+
+    return (hdr->size - (MAX(aligned_size, MIN_BLOCK_SIZE) + sizeof(Header) + MIN_BLOCK_SIZE)) > 0;
 }
 
 /**
@@ -239,7 +241,8 @@ bool hdr_should_split(Header *hdr, size_t size)
 static
 Header *hdr_split(Header *hdr, size_t req_size)
 {
-    size_t alloc_size = MAX(req_size, MIN_BLOCK_SIZE);
+    size_t aligned_size = ALIGN(req_size, sizeof(size_t));
+    size_t alloc_size = MAX(aligned_size, MIN_BLOCK_SIZE);
 
     assert((hdr->size - (alloc_size + sizeof(Header) + MIN_BLOCK_SIZE)) > 0);
 
