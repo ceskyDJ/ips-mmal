@@ -1,3 +1,7 @@
+/**
+ * @file test_mmal.c
+ * @author Aleš Smrčka
+ */
 #undef NDEBUG
 
 #include <stdio.h>
